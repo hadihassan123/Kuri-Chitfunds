@@ -3,15 +3,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Users, Calendar, Coins, ArrowRight } from 'lucide-react';
+import { Users, Calendar, Coins, ArrowRight, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { deleteChit } from '@/lib/chitApi';
 
 interface ChitCardProps {
   chit: ChitFund;
+  onDeleted?: (chitId: string) => void;
 }
 
-export function ChitCard({ chit }: ChitCardProps) {
+export function ChitCard({ chit, onDeleted }: ChitCardProps) {
   const navigate = useNavigate();
+  const [deleting, setDeleting] = useState(false);
 
   const getCurrencySymbol = (code: string): string => {
     const symbols: Record<string, string> = {
@@ -30,11 +34,28 @@ export function ChitCard({ chit }: ChitCardProps) {
     }
   };
 
+  const handleDelete = async () => {
+    const confirmed = window.confirm(
+      `Delete "${chit.name}"? This permanently deletes the Kuri and its members, draws, and payments. This action cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    setDeleting(true);
+    try {
+      await deleteChit(chit.id);
+      onDeleted?.(chit.id);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Failed to delete Kuri');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const totalValue = chit.monthlyAmount * chit.totalMembers;
-  const progress = chit.status === 'completed' 
-    ? 100 
-    : chit.status === 'active' 
-      ? ((chit.currentMonth - 1) / chit.durationMonths) * 100 
+  const progress = chit.status === 'completed'
+    ? 100
+    : chit.status === 'active'
+      ? ((chit.currentMonth - 1) / chit.durationMonths) * 100
       : (chit.members.length / chit.totalMembers) * 100;
 
   return (
@@ -58,9 +79,7 @@ export function ChitCard({ chit }: ChitCardProps) {
             <Coins className="h-4 w-4 text-muted-foreground" />
             <div>
               <p className="text-muted-foreground">Monthly</p>
-              <p className="font-medium">
-                {getCurrencySymbol(chit.currency)}{chit.monthlyAmount.toLocaleString()}
-              </p>
+              <p className="font-medium">{getCurrencySymbol(chit.currency)}{chit.monthlyAmount.toLocaleString()}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -85,7 +104,7 @@ export function ChitCard({ chit }: ChitCardProps) {
               {chit.status === 'draft' ? 'Members joined' : 'Progress'}
             </span>
             <span className="font-medium">
-              {chit.status === 'active' 
+              {chit.status === 'active'
                 ? `Month ${Math.max(1, chit.currentMonth - 1)} of ${chit.durationMonths}`
                 : chit.status === 'completed'
                   ? 'Completed'
@@ -103,14 +122,27 @@ export function ChitCard({ chit }: ChitCardProps) {
               {getCurrencySymbol(chit.currency)}{totalValue.toLocaleString()}
             </p>
           </div>
-          <Button 
-            variant="ghost" 
-            className="group-hover:bg-primary group-hover:text-primary-foreground transition-colors"
-            onClick={() => navigate(`/chit/${chit.id}`)}
-          >
-            View Details
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={deleting}
+              onClick={handleDelete}
+              aria-label={`Delete ${chit.name}`}
+              title="Delete Kuri"
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              className="group-hover:bg-primary group-hover:text-primary-foreground transition-colors"
+              onClick={() => navigate(`/chit/${chit.id}`)}
+            >
+              View Details
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
