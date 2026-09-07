@@ -66,6 +66,11 @@ class ChitFundCreate(BaseModel):
     organizer_wins_first: bool = True
     organizer_upi: Optional[str] = None
 
+    @property
+    def duration_months(self) -> int:
+        """A Kuri has exactly one draw/month per member."""
+        return self.total_members
+
 
 class ChitFundResponse(BaseModel):
     id: str
