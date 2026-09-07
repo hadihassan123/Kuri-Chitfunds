@@ -45,9 +45,7 @@ def get_chits(user_id: str = Depends(get_current_user_id), db: Session = Depends
     chits = db.query(ChitFund).filter(
         or_(
             ChitFund.user_id == user_id,
-            ChitFund.id.in_(
-                db.query(Member.chit_fund_id).filter(Member.user_id == user_id)
-            )
+            ChitFund.id.in_(db.query(Member.chit_fund_id).filter(Member.user_id == user_id))
         )
     ).all()
     return chits
@@ -60,6 +58,10 @@ def get_chit(chit_id: str, user_id: str = Depends(get_current_user_id), db: Sess
 
 @app.post("/api/chits", response_model=ChitFundResponse)
 def create_chit(payload: ChitFundCreate, user_id: str = Depends(get_current_user_id), db: Session = Depends(get_db)):
+    # The organizer is also a member. Generate that member id before inserting
+    # the chit so the non-null organizer_id is valid on the first INSERT.
+    organizer_id = str(__import__('uuid').uuid4())[:15]
+
     chit = ChitFund(
         name=payload.name,
         description=payload.description,
@@ -67,6 +69,7 @@ def create_chit(payload: ChitFundCreate, user_id: str = Depends(get_current_user
         currency=payload.currency,
         total_members=payload.total_members,
         duration_months=payload.duration_months,
+        organizer_id=organizer_id,
         organizer_wins_first=payload.organizer_wins_first,
         organizer_upi=payload.organizer_upi,
         status=ChitStatus.DRAFT,
@@ -77,6 +80,7 @@ def create_chit(payload: ChitFundCreate, user_id: str = Depends(get_current_user
     db.flush()
 
     organizer = Member(
+        id=organizer_id,
         chit_fund_id=chit.id,
         name=payload.organizer_name,
         email=payload.organizer_email,
@@ -85,9 +89,7 @@ def create_chit(payload: ChitFundCreate, user_id: str = Depends(get_current_user
         user_id=user_id,
     )
     db.add(organizer)
-    db.flush()
 
-    chit.organizer_id = organizer.id
     db.commit()
     db.refresh(chit)
     return chit
@@ -107,10 +109,7 @@ def add_member(chit_id: str, payload: MemberCreate, user_id: str = Depends(get_c
     if len(chit.members) >= chit.total_members:
         raise HTTPException(status_code=400, detail="Maximum members reached")
 
-    existing = db.query(Member).filter(
-        Member.chit_fund_id == chit_id,
-        Member.email == payload.email
-    ).first()
+    existing = db.query(Member).filter(Member.chit_fund_id == chit_id, Member.email == payload.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Member with this email already exists")
 
@@ -143,10 +142,7 @@ def remove_member(chit_id: str, member_id: str, user_id: str = Depends(get_curre
     if member_id == chit.organizer_id:
         raise HTTPException(status_code=400, detail="Cannot remove the organizer")
 
-    member = db.query(Member).filter(
-        Member.id == member_id,
-        Member.chit_fund_id == chit_id
-    ).first()
+    member = db.query(Member).filter(Member.id == member_id, Member.chit_fund_id == chit_id).first()
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
 
@@ -158,7 +154,6 @@ def remove_member(chit_id: str, member_id: str, user_id: str = Depends(get_curre
 @app.delete("/api/chits/{chit_id}")
 def delete_chit(chit_id: str, user_id: str = Depends(get_current_user_id), db: Session = Depends(get_db)):
     chit = require_chit_organizer(chit_id, user_id, db)
-
     db.delete(chit)
     db.commit()
     return {"message": "Chit fund deleted successfully"}
@@ -167,7 +162,6 @@ def delete_chit(chit_id: str, user_id: str = Depends(get_current_user_id), db: S
 @app.get("/api/chits/{chit_id}/eligible", response_model=List[MemberResponse])
 def get_eligible_members(chit_id: str, user_id: str = Depends(get_current_user_id), db: Session = Depends(get_db)):
     chit = get_chit_for_user(chit_id, user_id, db)
-
     eligible = [m for m in chit.members if not m.has_won]
     if not chit.organizer_wins_first and chit.current_month < chit.duration_months:
         eligible = [m for m in eligible if m.id != chit.organizer_id]
@@ -211,29 +205,14 @@ def conduct_draw(chit_id: str, user_id: str = Depends(get_current_user_id), db: 
     winner.has_won = True
     winner.won_in_month = chit.current_month
 
-    draw_result = DrawResult(
-        chit_fund_id=chit.id,
-        month=chit.current_month,
-        winner_id=winner.id,
-        winner_name=winner.name
-    )
+    draw_result = DrawResult(chit_fund_id=chit.id, month=chit.current_month, winner_id=winner.id, winner_name=winner.name)
     db.add(draw_result)
 
     month = chit.current_month
     for member in members:
-        existing = db.query(Payment).filter(
-            Payment.chit_fund_id == chit_id,
-            Payment.member_id == member.id,
-            Payment.month == month
-        ).first()
+        existing = db.query(Payment).filter(Payment.chit_fund_id == chit_id, Payment.member_id == member.id, Payment.month == month).first()
         if not existing:
-            db.add(Payment(
-                chit_fund_id=chit.id,
-                member_id=member.id,
-                month=month,
-                amount=chit.monthly_amount,
-                is_paid=False
-            ))
+            db.add(Payment(chit_fund_id=chit.id, member_id=member.id, month=month, amount=chit.monthly_amount, is_paid=False))
 
     chit.current_month += 1
     if chit.current_month > chit.duration_months:
@@ -255,22 +234,17 @@ def mark_paid(chit_id: str, payment_id: str, user_id: str = Depends(get_current_
     payment = db.query(Payment).filter(Payment.id == payment_id, Payment.chit_fund_id == chit_id).first()
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
-
     chit = db.query(ChitFund).filter(ChitFund.id == chit_id).first()
     if not chit:
         raise HTTPException(status_code=404, detail="Chit fund not found")
-
     is_organizer = chit.user_id == user_id
     member = db.query(Member).filter(Member.id == payment.member_id, Member.chit_fund_id == chit_id).first()
     is_own_payment = member is not None and member.user_id == user_id
-
     if not is_organizer and not is_own_payment:
         raise HTTPException(status_code=403, detail="Not authorized")
-
     payment.is_paid = True
     payment.paid_at = func.now()
     payment.marked_by = "organizer" if is_organizer else "member"
-
     db.commit()
     db.refresh(payment)
     return payment
@@ -279,15 +253,12 @@ def mark_paid(chit_id: str, payment_id: str, user_id: str = Depends(get_current_
 @app.patch("/api/chits/{chit_id}/payments/{payment_id}/mark-unpaid")
 def mark_unpaid(chit_id: str, payment_id: str, user_id: str = Depends(get_current_user_id), db: Session = Depends(get_db)):
     require_chit_organizer(chit_id, user_id, db)
-
     payment = db.query(Payment).filter(Payment.id == payment_id, Payment.chit_fund_id == chit_id).first()
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
-
     payment.is_paid = False
     payment.paid_at = None
     payment.marked_by = None
-
     db.commit()
     db.refresh(payment)
     return payment
