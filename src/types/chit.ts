@@ -39,7 +39,6 @@ export interface CreateChitPayload {
   monthlyAmount: number;
   currency: string;
   totalMembers: number;
-  durationMonths: number;
   organizerName: string;
   organizerEmail: string;
   organizerCountry: string;
