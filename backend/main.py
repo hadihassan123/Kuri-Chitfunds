@@ -97,8 +97,6 @@ def create_chit(payload: ChitFundCreate, user_id: str = Depends(get_current_user
 def add_member(chit_id: str, payload: MemberCreate, user_id: str = Depends(get_current_user_id), db: Session = Depends(get_db)):
     require_chit_organizer(chit_id, user_id, db)
 
-    # Lock the chit for the whole enrollment transaction so concurrent organizers
-    # cannot both observe the same remaining capacity and exceed total_members.
     chit = db.query(ChitFund).filter(ChitFund.id == chit_id).with_for_update().first()
     if not chit:
         raise HTTPException(status_code=404, detail="Chit fund not found")
@@ -157,6 +155,15 @@ def remove_member(chit_id: str, member_id: str, user_id: str = Depends(get_curre
     return {"message": "Member removed successfully"}
 
 
+@app.delete("/api/chits/{chit_id}")
+def delete_chit(chit_id: str, user_id: str = Depends(get_current_user_id), db: Session = Depends(get_db)):
+    chit = require_chit_organizer(chit_id, user_id, db)
+
+    db.delete(chit)
+    db.commit()
+    return {"message": "Chit fund deleted successfully"}
+
+
 @app.get("/api/chits/{chit_id}/eligible", response_model=List[MemberResponse])
 def get_eligible_members(chit_id: str, user_id: str = Depends(get_current_user_id), db: Session = Depends(get_db)):
     chit = get_chit_for_user(chit_id, user_id, db)
@@ -169,8 +176,6 @@ def get_eligible_members(chit_id: str, user_id: str = Depends(get_current_user_i
 
 @app.post("/api/chits/{chit_id}/draw", response_model=DrawResultResponse)
 def conduct_draw(chit_id: str, user_id: str = Depends(get_current_user_id), db: Session = Depends(get_db)):
-    # Serialize draws for a chit. PostgreSQL holds this row lock until commit/rollback,
-    # so concurrent requests cannot both advance the same current_month.
     chit = db.query(ChitFund).filter(ChitFund.id == chit_id).with_for_update().first()
     if not chit:
         raise HTTPException(status_code=404, detail="Chit fund not found")
@@ -181,10 +186,7 @@ def conduct_draw(chit_id: str, user_id: str = Depends(get_current_user_id), db: 
     if chit.current_month > chit.duration_months:
         raise HTTPException(status_code=400, detail="All draws completed")
 
-    members = db.query(Member).filter(
-        Member.chit_fund_id == chit_id
-    ).with_for_update().all()
-
+    members = db.query(Member).filter(Member.chit_fund_id == chit_id).with_for_update().all()
     eligible = [m for m in members if not m.has_won]
     if not eligible:
         raise HTTPException(status_code=400, detail="No eligible members")
@@ -250,10 +252,7 @@ def get_payments(chit_id: str, user_id: str = Depends(get_current_user_id), db: 
 
 @app.patch("/api/chits/{chit_id}/payments/{payment_id}/mark-paid")
 def mark_paid(chit_id: str, payment_id: str, user_id: str = Depends(get_current_user_id), db: Session = Depends(get_db)):
-    payment = db.query(Payment).filter(
-        Payment.id == payment_id,
-        Payment.chit_fund_id == chit_id
-    ).first()
+    payment = db.query(Payment).filter(Payment.id == payment_id, Payment.chit_fund_id == chit_id).first()
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
 
@@ -262,10 +261,7 @@ def mark_paid(chit_id: str, payment_id: str, user_id: str = Depends(get_current_
         raise HTTPException(status_code=404, detail="Chit fund not found")
 
     is_organizer = chit.user_id == user_id
-    member = db.query(Member).filter(
-        Member.id == payment.member_id,
-        Member.chit_fund_id == chit_id,
-    ).first()
+    member = db.query(Member).filter(Member.id == payment.member_id, Member.chit_fund_id == chit_id).first()
     is_own_payment = member is not None and member.user_id == user_id
 
     if not is_organizer and not is_own_payment:
@@ -284,10 +280,7 @@ def mark_paid(chit_id: str, payment_id: str, user_id: str = Depends(get_current_
 def mark_unpaid(chit_id: str, payment_id: str, user_id: str = Depends(get_current_user_id), db: Session = Depends(get_db)):
     require_chit_organizer(chit_id, user_id, db)
 
-    payment = db.query(Payment).filter(
-        Payment.id == payment_id,
-        Payment.chit_fund_id == chit_id
-    ).first()
+    payment = db.query(Payment).filter(Payment.id == payment_id, Payment.chit_fund_id == chit_id).first()
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
 
