@@ -30,7 +30,13 @@ class ChitFund(Base):
     organizer_id = Column(String, nullable=False)
     organizer_wins_first = Column(Boolean, default=True)
     organizer_upi = Column(String(100), nullable=True)
-    status = Column(Enum(ChitStatus), default=ChitStatus.DRAFT)
+    status = Column(
+        Enum(
+            ChitStatus,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
+        default=ChitStatus.DRAFT,
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     user_id = Column(String, nullable=True)
 
