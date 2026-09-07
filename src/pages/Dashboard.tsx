@@ -29,6 +29,10 @@ export default function Dashboard() {
     loadChits();
   }, []);
 
+  const handleDeleted = (chitId: string) => {
+    setChits(current => current.filter(chit => chit.id !== chitId));
+  };
+
   const stats = {
     total: chits.length,
     active: chits.filter(c => c.status === 'active').length,
@@ -39,9 +43,8 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      
+
       <main className="container py-8">
-        {/* Hero Section */}
         <div className="mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
@@ -57,7 +60,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -101,7 +103,6 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* Chit List */}
         {loading ? (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3].map((i) => (
@@ -127,7 +128,7 @@ export default function Dashboard() {
               </div>
               <CardTitle>No Chit Funds/Kuris Yet</CardTitle>
               <CardDescription className="max-w-md mx-auto">
-                Create your first digital chit fund/kuri to start managing savings groups 
+                Create your first digital chit fund/kuri to start managing savings groups
                 with members from around the world.
               </CardDescription>
               <Button className="mt-6" onClick={() => setCreateDialogOpen(true)}>
@@ -141,7 +142,7 @@ export default function Dashboard() {
             <h2 className="text-xl font-semibold mb-4">Your Chit Funds/Kuris</h2>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {chits.map((chit) => (
-                <ChitCard key={chit.id} chit={chit} />
+                <ChitCard key={chit.id} chit={chit} onDeleted={handleDeleted} />
               ))}
             </div>
           </div>
