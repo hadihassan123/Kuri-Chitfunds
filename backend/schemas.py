@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
@@ -57,10 +57,9 @@ class DrawResultResponse(BaseModel):
 class ChitFundCreate(BaseModel):
     name: str
     description: Optional[str] = None
-    monthly_amount: int
+    monthly_amount: int = Field(gt=0)
     currency: str = "INR"
-    total_members: int
-    duration_months: int
+    total_members: int = Field(ge=2, le=20)
     organizer_name: str
     organizer_email: EmailStr
     organizer_country: str
