@@ -1,16 +1,19 @@
 import { useState, useEffect } from 'react';
-import { Plus, Coins, Users, Trophy, TrendingUp } from 'lucide-react';
+import { Plus, Coins, Users, Trophy, TrendingUp, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChitCard } from '@/components/ChitCard';
 import { CreateChitDialog } from '@/components/CreateChitDialog';
 import { Header } from '@/components/Header';
 import { api } from '@/lib/api';
-import { ChitFund } from '@/types/chit';
+import { ChitFund, PendingMembership } from '@/types/chit';
+import { toast } from '@/hooks/use-toast';
 
 export default function Dashboard() {
   const [chits, setChits] = useState<ChitFund[]>([]);
+  const [pendingMemberships, setPendingMemberships] = useState<PendingMembership[]>([]);
   const [loading, setLoading] = useState(true);
+  const [claimingMemberId, setClaimingMemberId] = useState<string | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   const loadChits = async () => {
@@ -25,9 +28,39 @@ export default function Dashboard() {
     }
   };
 
+  const loadPendingMemberships = async () => {
+    try {
+      const data = await api.getPendingMemberships();
+      setPendingMemberships(data);
+    } catch (error) {
+      console.error('Failed to load pending memberships:', error);
+    }
+  };
+
   useEffect(() => {
-    loadChits();
+    void Promise.all([loadChits(), loadPendingMemberships()]);
   }, []);
+
+  const handleClaim = async (memberId: string) => {
+    setClaimingMemberId(memberId);
+    try {
+      const claimed = await api.claimMembership(memberId);
+      setPendingMemberships(current => current.filter(item => item.memberId !== memberId));
+      await loadChits();
+      toast({
+        title: 'Membership claimed',
+        description: `You joined ${claimed.chitName} successfully.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Unable to claim membership',
+        description: error instanceof Error ? error.message : 'Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setClaimingMemberId(null);
+    }
+  };
 
   const handleDeleted = (chitId: string) => {
     setChits(current => current.filter(chit => chit.id !== chitId));
@@ -59,6 +92,41 @@ export default function Dashboard() {
             </Button>
           </div>
         </div>
+
+        {pendingMemberships.length > 0 && (
+          <Card className="mb-8 border-primary/30">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <UserCheck className="h-5 w-5" />
+                Pending Kuri Invitations
+              </CardTitle>
+              <CardDescription>
+                These memberships match your signed-in email. Claim one to access the Kuri as a member.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {pendingMemberships.map((membership) => (
+                <div
+                  key={membership.memberId}
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border p-4"
+                >
+                  <div>
+                    <p className="font-medium">{membership.chitName}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Member: {membership.memberName} · {membership.email}
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => void handleClaim(membership.memberId)}
+                    disabled={claimingMemberId !== null}
+                  >
+                    {claimingMemberId === membership.memberId ? 'Claiming…' : 'Claim Membership'}
+                  </Button>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <Card>
