@@ -10,10 +10,10 @@ from database import get_db, engine, Base
 from models import ChitFund, Member, DrawResult, Payment, ChitStatus
 from schemas import (
     ChitFundCreate, ChitFundResponse, ChitFundListResponse,
-    MemberCreate, MemberResponse, DrawResultResponse, PaymentResponse
+    MemberCreate, MemberResponse, MembershipClaimResponse, DrawResultResponse, PaymentResponse
 )
 from config import get_settings
-from auth import get_current_user_id
+from auth import get_current_user_id, get_current_user_email
 from authz import get_chit_for_user, require_chit_organizer
 
 Base.metadata.create_all(bind=engine)
@@ -31,7 +31,7 @@ app.add_middleware(
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"] ,
+    allow_headers=["*"],
 )
 
 
@@ -56,10 +56,63 @@ def get_chit(chit_id: str, user_id: str = Depends(get_current_user_id), db: Sess
     return get_chit_for_user(chit_id, user_id, db)
 
 
+@app.get("/api/memberships/pending", response_model=List[MembershipClaimResponse])
+def get_pending_memberships(
+    email: str = Depends(get_current_user_email),
+    db: Session = Depends(get_db),
+):
+    rows = (
+        db.query(Member, ChitFund)
+        .join(ChitFund, ChitFund.id == Member.chit_fund_id)
+        .filter(func.lower(Member.email) == email, Member.user_id.is_(None))
+        .all()
+    )
+    return [
+        MembershipClaimResponse(
+            member_id=member.id,
+            chit_id=chit.id,
+            chit_name=chit.name,
+            member_name=member.name,
+            email=member.email,
+        )
+        for member, chit in rows
+    ]
+
+
+@app.post("/api/memberships/{member_id}/claim", response_model=MembershipClaimResponse)
+def claim_membership(
+    member_id: str,
+    user_id: str = Depends(get_current_user_id),
+    email: str = Depends(get_current_user_email),
+    db: Session = Depends(get_db),
+):
+    member = db.query(Member).filter(Member.id == member_id).with_for_update().first()
+    if not member:
+        raise HTTPException(status_code=404, detail="Membership not found")
+    if member.user_id is not None:
+        if member.user_id == user_id:
+            raise HTTPException(status_code=409, detail="Membership already claimed")
+        raise HTTPException(status_code=409, detail="Membership already claimed by another account")
+    if member.email.strip().lower() != email:
+        raise HTTPException(status_code=404, detail="Membership not found")
+
+    chit = db.query(ChitFund).filter(ChitFund.id == member.chit_fund_id).first()
+    if not chit:
+        raise HTTPException(status_code=404, detail="Chit fund not found")
+
+    member.user_id = user_id
+    db.commit()
+    return MembershipClaimResponse(
+        member_id=member.id,
+        chit_id=chit.id,
+        chit_name=chit.name,
+        member_name=member.name,
+        email=member.email,
+    )
+
+
 @app.post("/api/chits", response_model=ChitFundResponse)
 def create_chit(payload: ChitFundCreate, user_id: str = Depends(get_current_user_id), db: Session = Depends(get_db)):
-    # The organizer is also a member. Generate that member id before inserting
-    # the chit so the non-null organizer_id is valid on the first INSERT.
     organizer_id = str(__import__('uuid').uuid4())[:15]
 
     chit = ChitFund(
@@ -109,18 +162,22 @@ def add_member(chit_id: str, payload: MemberCreate, user_id: str = Depends(get_c
     if len(chit.members) >= chit.total_members:
         raise HTTPException(status_code=400, detail="Maximum members reached")
 
-    existing = db.query(Member).filter(Member.chit_fund_id == chit_id, Member.email == payload.email).first()
+    normalized_email = payload.email.strip().lower()
+    existing = db.query(Member).filter(
+        Member.chit_fund_id == chit_id,
+        func.lower(Member.email) == normalized_email,
+    ).first()
     if existing:
         raise HTTPException(status_code=400, detail="Member with this email already exists")
 
     member = Member(
         chit_fund_id=chit_id,
         name=payload.name,
-        email=payload.email,
+        email=normalized_email,
         phone=payload.phone,
         country=payload.country,
         has_won=False,
-        user_id=user_id,
+        user_id=None,
     )
     db.add(member)
     db.flush()
@@ -210,9 +267,19 @@ def conduct_draw(chit_id: str, user_id: str = Depends(get_current_user_id), db: 
 
     month = chit.current_month
     for member in members:
-        existing = db.query(Payment).filter(Payment.chit_fund_id == chit_id, Payment.member_id == member.id, Payment.month == month).first()
+        existing = db.query(Payment).filter(
+            Payment.chit_fund_id == chit_id,
+            Payment.member_id == member.id,
+            Payment.month == month,
+        ).first()
         if not existing:
-            db.add(Payment(chit_fund_id=chit.id, member_id=member.id, month=month, amount=chit.monthly_amount, is_paid=False))
+            db.add(Payment(
+                chit_fund_id=chit.id,
+                member_id=member.id,
+                month=month,
+                amount=chit.monthly_amount,
+                is_paid=False,
+            ))
 
     chit.current_month += 1
     if chit.current_month > chit.duration_months:
