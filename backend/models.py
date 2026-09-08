@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey, Enum, UniqueConstraint
+from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey, Enum, UniqueConstraint, CheckConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
@@ -18,6 +18,9 @@ class ChitStatus(str, enum.Enum):
 
 class ChitFund(Base):
     __tablename__ = "chit_funds"
+    __table_args__ = (
+        CheckConstraint("duration_months = total_members", name="chit_funds_duration_members_check"),
+    )
 
     id = Column(String, primary_key=True, default=generate_uuid)
     name = Column(String(100), nullable=False)
