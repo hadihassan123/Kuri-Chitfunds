@@ -32,7 +32,7 @@ const formSchema = z.object({
   organizerEmail: z.string().email('Valid email required'),
   organizerCountry: z.string().min(1, 'Select your country'),
   organizerWinsFirst: z.boolean(),
-  organizerUpi: z.string().min(5, 'Enter a valid UPI ID').regex(/^[\w.\-]+@[\w]+$/, 'Invalid UPI ID format e.g. name@upi'),
+  organizerUpi: z.string().min(5, 'Enter a valid UPI ID').regex(/^[\w.-]+@[\w]+$/, 'Invalid UPI ID format e.g. name@upi'),
   organizerUpiConfirm: z.string().min(5, 'Please confirm your UPI ID'),
 }).refine((data) => data.organizerUpi === data.organizerUpiConfirm, { message: "UPI IDs don't match", path: ['organizerUpiConfirm'] });
 type FormValues = z.infer<typeof formSchema>;
@@ -59,7 +59,7 @@ export function CreateChitDialog({ open, onOpenChange, onSuccess }: CreateChitDi
       form.setValue('organizerEmail', user.email || '');
     };
     loadUser();
-  }, [open]);
+  }, [open, form]);
 
   const getShareableLink = (chitId: string) => `${window.location.origin}/join/${chitId}`;
 
@@ -84,9 +84,10 @@ export function CreateChitDialog({ open, onOpenChange, onSuccess }: CreateChitDi
         organizerWinsFirst: values.organizerWinsFirst,
       });
       setCreatedLink(getShareableLink(newChit.id));
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Create chit error:', error);
-      toast({ title: 'Failed to create chit', description: error?.message || 'Please try again.', variant: 'destructive' });
+      const message = error instanceof Error ? error.message : 'Please try again.';
+      toast({ title: 'Failed to create chit', description: message, variant: 'destructive' });
     } finally { setIsSubmitting(false); }
   };
 
