@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, PlayCircle, Users, Calendar, Crown, Info, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -37,8 +37,9 @@ function PaymentsTab({ chit, currentUserId }: { chit: ChitFund; currentUserId: s
       await api.markPaid(chit.id, paymentId);
       const updated = await api.getPayments(chit.id);
       setPayments(updated);
-    } catch (error: any) {
-      toast({ title: 'Failed to mark paid', description: error?.message, variant: 'destructive' });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Please try again.';
+      toast({ title: 'Failed to mark paid', description: message, variant: 'destructive' });
     }
   };
 
@@ -47,8 +48,9 @@ function PaymentsTab({ chit, currentUserId }: { chit: ChitFund; currentUserId: s
       await api.markUnpaid(chit.id, paymentId);
       const updated = await api.getPayments(chit.id);
       setPayments(updated);
-    } catch (error: any) {
-      toast({ title: 'Failed to mark unpaid', description: error?.message, variant: 'destructive' });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Please try again.';
+      toast({ title: 'Failed to mark unpaid', description: message, variant: 'destructive' });
     }
   };
 
@@ -117,27 +119,28 @@ export default function ChitDetails() {
     });
   }, []);
 
-  const loadChit = async () => {
+  const loadChit = useCallback(async () => {
     if (!id) return;
     setLoading(true);
     try {
       const data = await api.getChit(id);
       setChit(data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to load chit:', error);
+      const message = error instanceof Error ? error.message : 'Please refresh the page.';
       toast({
         title: 'Failed to load chit',
-        description: error?.message || 'Please refresh the page.',
+        description: message,
         variant: 'destructive',
       });
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
   useEffect(() => {
     loadChit();
-  }, [id]);
+  }, [loadChit]);
 
   if (loading) {
     return (
