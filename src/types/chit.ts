@@ -8,6 +8,14 @@ export interface Member {
   wonInMonth?: number;
 }
 
+export interface PendingMembership {
+  memberId: string;
+  chitId: string;
+  chitName: string;
+  memberName: string;
+  email: string;
+}
+
 export interface DrawResult {
   id: string;
   month: number;
@@ -26,7 +34,7 @@ export interface ChitFund {
   durationMonths: number;
   currentMonth: number;
   organizerId: string;
-  organizerWinsFirst: boolean; // true = first month, false = last month
+  organizerWinsFirst: boolean;
   members: Member[];
   draws: DrawResult[];
   status: 'draft' | 'active' | 'completed';
