@@ -1,4 +1,4 @@
-import { useState,useEffect } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Coins, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -19,7 +19,7 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
-    if (!name ||!email || !password || !confirmPassword) {
+    if (!name || !email || !password || !confirmPassword) {
       toast({ title: 'Missing fields', description: 'Please fill in all fields.', variant: 'destructive' });
       return;
     }
@@ -36,14 +36,15 @@ export default function Register() {
 
     setLoading(true);
     try {
-      const { error } = await supabase!.auth.signUp({ email, password,options: { data: { name } } });
+      const { error } = await supabase!.auth.signUp({ email, password, options: { data: { name } } });
       if (error) throw error;
       toast({ title: 'Account created!', description: 'You are now logged in.' });
       navigate('/');
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Something went wrong.';
       toast({
         title: 'Registration failed',
-        description: error.message || 'Something went wrong.',
+        description: message,
         variant: 'destructive',
       });
     } finally {
@@ -65,40 +66,18 @@ export default function Register() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Name</Label>
-            <Input
-              id="name"
-              type="text"
-              placeholder="John Doe"
-              value={name}
-              onChange={e => setName(e.target.value)}
-            />
+            <Input id="name" type="text" placeholder="John Doe" value={name} onChange={e => setName(e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-            />
+            <Input id="email" type="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
             <div className="relative">
-              <Input
-                id="password"
-                type={showPassword ? 'text' : 'password'}
-                placeholder="Min. 6 characters"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-              />
-              <button
-                type="button"
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                onClick={() => setShowPassword(!showPassword)}
-              >
+              <Input id="password" type={showPassword ? 'text' : 'password'} placeholder="Min. 6 characters" value={password} onChange={e => setPassword(e.target.value)} />
+              <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setShowPassword(!showPassword)}>
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
@@ -106,14 +85,7 @@ export default function Register() {
 
           <div className="space-y-2">
             <Label htmlFor="confirmPassword">Confirm Password</Label>
-            <Input
-              id="confirmPassword"
-              type="password"
-              placeholder="••••••••"
-              value={confirmPassword}
-              onChange={e => setConfirmPassword(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleRegister()}
-            />
+            <Input id="confirmPassword" type="password" placeholder="••••••••" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleRegister()} />
           </div>
 
           <Button className="w-full" onClick={handleRegister} disabled={loading}>
@@ -122,9 +94,7 @@ export default function Register() {
 
           <p className="text-center text-sm text-muted-foreground">
             Already have an account?{' '}
-            <Link to="/login" className="text-primary hover:underline font-medium">
-              Sign in
-            </Link>
+            <Link to="/login" className="text-primary hover:underline font-medium">Sign in</Link>
           </p>
         </CardContent>
       </Card>
