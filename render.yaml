@@ -1,31 +1,42 @@
 services:
-  # Backend Service
+  # FastAPI application tier. Supabase is the authoritative data tier.
   - type: web
     name: kuri-backend
-    env: python
-    buildCommand: pip install -r backend/requirements.txt
-    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port 8000
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /
+    autoDeployTrigger: checksPass
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: kuri-db
-          property: connectionString
+        sync: false
       - key: CORS_ORIGINS
-        value: "*" # Update this to your frontend URL after deployment
+        value: https://kuri-frontend.onrender.com
 
-  # Frontend Service
+  # React/Vite presentation tier.
   - type: web
     name: kuri-frontend
-    env: static
-    buildCommand: npm install && npm run build
+    runtime: static
+    buildCommand: npm ci && npm run build
     staticPublishPath: dist
+    autoDeployTrigger: checksPass
+    headers:
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://kuri-frontend.onrender.com https://kxhjkfwqcmgfbxqqyqby.supabase.co; connect-src 'self' https://kuri-backend-0veb.onrender.com https://kxhjkfwqcmgfbxqqyqby.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none';"
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: Permissions-Policy
+        value: "camera=(), microphone=(), geolocation=()"
     envVars:
       - key: VITE_API_URL
-        fromService:
-          type: web
-          name: kuri-backend
-          property: host
-
-databases:
-  - name: kuri-db
-    plan: free # Use Render's free tier for PostgreSQL
+        value: https://kuri-backend-0veb.onrender.com
