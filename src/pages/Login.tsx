@@ -27,10 +27,11 @@ export default function Login() {
       const { error } = await supabase!.auth.signInWithPassword({ email, password });
       if (error) throw error;
       navigate('/');
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Invalid email or password.';
       toast({
         title: 'Login failed',
-        description: error.message || 'Invalid email or password.',
+        description: message,
         variant: 'destructive',
       });
     } finally {
