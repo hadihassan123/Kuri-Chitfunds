@@ -3,6 +3,7 @@ import {
   Member,
   DrawResult,
   Payment,
+  PendingMembership,
   CreateChitPayload,
   AddMemberPayload,
 } from '@/types/chit';
@@ -73,6 +74,16 @@ function mapChit(raw: Raw): ChitFund {
   };
 }
 
+function mapPendingMembership(raw: Raw): PendingMembership {
+  return {
+    memberId: raw.member_id as string,
+    chitId: raw.chit_id as string,
+    chitName: raw.chit_name as string,
+    memberName: raw.member_name as string,
+    email: raw.email as string,
+  };
+}
+
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const authHeaders = await getAuthHeaders();
   const res = await fetchWithTimeout(`${API_BASE_URL}${path}`, {
@@ -100,6 +111,17 @@ export const api = {
       if (error instanceof Error && error.message === 'Chit fund not found') return null;
       throw error;
     }
+  },
+
+  async getPendingMemberships(): Promise<PendingMembership[]> {
+    const data = await apiFetch<Raw[]>('/api/memberships/pending');
+    return data.map(mapPendingMembership);
+  },
+
+  async claimMembership(memberId: string): Promise<PendingMembership> {
+    return mapPendingMembership(await apiFetch<Raw>(`/api/memberships/${memberId}/claim`, {
+      method: 'POST',
+    }));
   },
 
   async createChit(payload: CreateChitPayload): Promise<ChitFund> {
