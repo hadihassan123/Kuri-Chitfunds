@@ -81,7 +81,7 @@ export function CreateChitDialog({ open, onOpenChange, onSuccess }: CreateChitDi
         name: values.name, description: values.description, monthlyAmount: values.monthlyAmount,
         currency: values.currency, totalMembers: values.totalMembers, organizerName: values.organizerName,
         organizerEmail: values.organizerEmail, organizerCountry: values.organizerCountry,
-        organizerWinsFirst: values.organizerWinsFirst,
+        organizerWinsFirst: values.organizerWinsFirst, organizerUpi: values.organizerUpi,
       });
       setCreatedLink(getShareableLink(newChit.id));
     } catch (error: unknown) {
