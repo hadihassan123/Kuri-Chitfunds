@@ -24,6 +24,16 @@ export interface DrawResult {
   drawnAt: string;
 }
 
+export interface Payment {
+  id: string;
+  member_id: string;
+  month: number;
+  amount: number;
+  is_paid: boolean;
+  paid_at?: string;
+  marked_by?: string;
+}
+
 export interface ChitFund {
   id: string;
   name: string;
@@ -35,6 +45,7 @@ export interface ChitFund {
   currentMonth: number;
   organizerId: string;
   organizerWinsFirst: boolean;
+  organizerUpi?: string;
   members: Member[];
   draws: DrawResult[];
   status: 'draft' | 'active' | 'completed';
@@ -51,6 +62,7 @@ export interface CreateChitPayload {
   organizerEmail: string;
   organizerCountry: string;
   organizerWinsFirst: boolean;
+  organizerUpi?: string;
 }
 
 export interface AddMemberPayload {
