@@ -67,6 +67,7 @@ function mapChit(raw: Raw): ChitFund {
     currentMonth: (raw.current_month ?? raw.currentMonth) as number,
     organizerId: (raw.organizer_id ?? raw.organizerId) as string,
     organizerWinsFirst: (raw.organizer_wins_first ?? raw.organizerWinsFirst) as boolean,
+    organizerUpi: (raw.organizer_upi ?? raw.organizerUpi) as string | undefined,
     status: raw.status as 'draft' | 'active' | 'completed',
     createdAt: (raw.created_at ?? raw.createdAt) as string,
     members: Array.isArray(raw.members) ? raw.members.map((m) => mapMember(m as Raw)) : [],
@@ -137,6 +138,7 @@ export const api = {
         organizer_email: payload.organizerEmail,
         organizer_country: payload.organizerCountry,
         organizer_wins_first: payload.organizerWinsFirst,
+        organizer_upi: payload.organizerUpi,
       }),
     });
     return mapChit(data);
