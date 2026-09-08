@@ -1,3 +1,4 @@
+from typing import Any, Dict
 from uuid import UUID
 
 import jwt
@@ -16,8 +17,7 @@ EXPECTED_AUDIENCE = "authenticated"
 _jwks_client = PyJWKClient(JWKS_URL)
 
 
-def get_current_user_id(request: Request) -> str:
-    """Verify the Supabase access token and return the authenticated user ID."""
+def _verify_access_token(request: Request) -> Dict[str, Any]:
     authorization = request.headers.get("Authorization", "")
     scheme, _, token = authorization.partition(" ")
 
@@ -44,8 +44,21 @@ def get_current_user_id(request: Request) -> str:
         subject = payload.get("sub")
         if not isinstance(subject, str) or not subject.strip():
             raise InvalidTokenError("Missing JWT subject")
-
         UUID(subject)
-        return subject
+        return payload
     except (InvalidTokenError, ValueError, TypeError, KeyError):
         raise HTTPException(status_code=401, detail="Invalid authentication token")
+
+
+def get_current_user_id(request: Request) -> str:
+    """Verify the Supabase access token and return the authenticated user ID."""
+    return str(_verify_access_token(request)["sub"])
+
+
+def get_current_user_email(request: Request) -> str:
+    """Return the email from the already-verified Supabase access token."""
+    payload = _verify_access_token(request)
+    email = payload.get("email")
+    if not isinstance(email, str) or not email.strip():
+        raise HTTPException(status_code=403, detail="Authenticated email is required")
+    return email.strip().lower()
