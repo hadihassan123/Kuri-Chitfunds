@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey, Enum
+from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey, Enum, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
@@ -64,6 +64,9 @@ class Member(Base):
 
 class DrawResult(Base):
     __tablename__ = "draw_results"
+    __table_args__ = (
+        UniqueConstraint("chit_fund_id", "month", name="draw_results_chit_fund_month_key"),
+    )
 
     id = Column(String, primary_key=True, default=generate_uuid)
     chit_fund_id = Column(String, ForeignKey("chit_funds.id"), nullable=False)
@@ -77,6 +80,14 @@ class DrawResult(Base):
 
 class Payment(Base):
     __tablename__ = "payments"
+    __table_args__ = (
+        UniqueConstraint(
+            "chit_fund_id",
+            "member_id",
+            "month",
+            name="payments_chit_fund_member_month_key",
+        ),
+    )
 
     id = Column(String, primary_key=True, default=generate_uuid)
     chit_fund_id = Column(String, ForeignKey("chit_funds.id"), nullable=False)
