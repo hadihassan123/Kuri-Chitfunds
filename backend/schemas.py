@@ -43,6 +43,14 @@ class MemberResponse(BaseModel):
         from_attributes = True
 
 
+class MembershipClaimResponse(BaseModel):
+    member_id: str
+    chit_id: str
+    chit_name: str
+    member_name: str
+    email: str
+
+
 class DrawResultResponse(BaseModel):
     id: str
     month: int
@@ -111,6 +119,3 @@ class ChitFundListResponse(BaseModel):
     members: List[MemberResponse]
     draws: List[DrawResultResponse]
     payments: List[PaymentResponse]
-
-    class Config:
-        from_attributes = True
