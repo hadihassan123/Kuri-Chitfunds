@@ -2,6 +2,7 @@ import {
   ChitFund,
   Member,
   DrawResult,
+  Payment,
   CreateChitPayload,
   AddMemberPayload,
 } from '@/types/chit';
@@ -85,11 +86,7 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   return res.json() as Promise<T>;
 }
 
-/**
- * Application data access boundary.
- * Supabase is used only for Auth/JWT retrieval; all chit/member/draw/payment
- * reads and writes go through FastAPI.
- */
+/** Supabase is used only for Auth/JWT retrieval; application data stays behind FastAPI. */
 export const api = {
   async getChits(): Promise<ChitFund[]> {
     const data = await apiFetch<Raw[]>('/api/chits');
@@ -98,8 +95,7 @@ export const api = {
 
   async getChit(id: string): Promise<ChitFund | null> {
     try {
-      const data = await apiFetch<Raw>(`/api/chits/${id}`);
-      return mapChit(data);
+      return mapChit(await apiFetch<Raw>(`/api/chits/${id}`));
     } catch (error) {
       if (error instanceof Error && error.message === 'Chit fund not found') return null;
       throw error;
@@ -107,30 +103,28 @@ export const api = {
   },
 
   async createChit(payload: CreateChitPayload): Promise<ChitFund> {
-    const body = {
-      name: payload.name,
-      description: payload.description,
-      monthly_amount: payload.monthlyAmount,
-      currency: payload.currency,
-      total_members: payload.totalMembers,
-      organizer_name: payload.organizerName,
-      organizer_email: payload.organizerEmail,
-      organizer_country: payload.organizerCountry,
-      organizer_wins_first: payload.organizerWinsFirst,
-    };
     const data = await apiFetch<Raw>('/api/chits', {
       method: 'POST',
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        name: payload.name,
+        description: payload.description,
+        monthly_amount: payload.monthlyAmount,
+        currency: payload.currency,
+        total_members: payload.totalMembers,
+        organizer_name: payload.organizerName,
+        organizer_email: payload.organizerEmail,
+        organizer_country: payload.organizerCountry,
+        organizer_wins_first: payload.organizerWinsFirst,
+      }),
     });
     return mapChit(data);
   },
 
   async addMember(chitId: string, payload: AddMemberPayload): Promise<Member> {
-    const data = await apiFetch<Raw>(`/api/chits/${chitId}/members`, {
+    return mapMember(await apiFetch<Raw>(`/api/chits/${chitId}/members`, {
       method: 'POST',
       body: JSON.stringify(payload),
-    });
-    return mapMember(data);
+    }));
   },
 
   async removeMember(chitId: string, memberId: string): Promise<void> {
@@ -143,19 +137,18 @@ export const api = {
   },
 
   async conductDraw(chitId: string): Promise<DrawResult> {
-    const data = await apiFetch<Raw>(`/api/chits/${chitId}/draw`, { method: 'POST' });
-    return mapDraw(data);
+    return mapDraw(await apiFetch<Raw>(`/api/chits/${chitId}/draw`, { method: 'POST' }));
   },
 
-  async getPayments(chitId: string): Promise<Raw[]> {
-    return apiFetch<Raw[]>(`/api/chits/${chitId}/payments`);
+  async getPayments(chitId: string): Promise<Payment[]> {
+    return apiFetch<Payment[]>(`/api/chits/${chitId}/payments`);
   },
 
-  async markPaid(chitId: string, paymentId: string): Promise<Raw> {
-    return apiFetch<Raw>(`/api/chits/${chitId}/payments/${paymentId}/mark-paid`, { method: 'PATCH' });
+  async markPaid(chitId: string, paymentId: string): Promise<Payment> {
+    return apiFetch<Payment>(`/api/chits/${chitId}/payments/${paymentId}/mark-paid`, { method: 'PATCH' });
   },
 
-  async markUnpaid(chitId: string, paymentId: string): Promise<Raw> {
-    return apiFetch<Raw>(`/api/chits/${chitId}/payments/${paymentId}/mark-unpaid`, { method: 'PATCH' });
+  async markUnpaid(chitId: string, paymentId: string): Promise<Payment> {
+    return apiFetch<Payment>(`/api/chits/${chitId}/payments/${paymentId}/mark-unpaid`, { method: 'PATCH' });
   },
 };
